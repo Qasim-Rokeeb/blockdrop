@@ -139,7 +139,7 @@ export function BlockDropGame() {
 
   useEffect(() => {
     if (player.collided) {
-      const newBoard = (prevBoard: BoardState) => {
+      setBoard(prevBoard => {
         const newBoardState = JSON.parse(JSON.stringify(prevBoard));
         player.tetromino.forEach((row, y) => {
           row.forEach((value, x) => {
@@ -148,33 +148,34 @@ export function BlockDropGame() {
             }
           });
         });
-        
+
         // Sweep rows
-        const sweptBoard = newBoardState.reduce((acc: BoardState, row) => {
-          if (row.every(cell => cell !== 0)) {
-            setRows(prev => prev + 1);
-            setScore(prev => prev + 10 * (level + 1));
-            acc.unshift(new Array(board[0].length).fill(0));
-            return acc;
+        const sweptBoard: BoardState = [];
+        let clearedRows = 0;
+        for (let y = newBoardState.length - 1; y >= 0; y--) {
+          if (newBoardState[y].every(cell => cell !== 0)) {
+            clearedRows++;
+          } else {
+            sweptBoard.unshift([...newBoardState[y]]);
           }
-          acc.push(row);
-          return acc;
-        }, []);
+        }
         
-        const clearedRows = newBoardState.length - sweptBoard.length;
         if (clearedRows > 0) {
-          // simple scoring
+          setRows(prev => prev + clearedRows);
           const linePoints = [40, 100, 300, 1200];
           setScore(prev => prev + linePoints[clearedRows-1] * (level + 1));
+          
+          while(clearedRows > 0){
+             sweptBoard.unshift(new Array(BOARD_WIDTH).fill(0));
+             clearedRows--;
+          }
         }
-
-        return sweptBoard;
-      };
-
-      setBoard(newBoard);
+        
+        return sweptBoard.length > 0 ? sweptBoard : newBoardState;
+      });
       resetPlayer();
     }
-  }, [player.collided, board, level, resetPlayer]);
+  }, [player.collided, level, resetPlayer]);
   
   useEffect(() => {
     if(rows > (level + 1) * 10) {
