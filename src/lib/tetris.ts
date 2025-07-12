@@ -1,8 +1,10 @@
 export const BOARD_WIDTH = 10;
 export const BOARD_HEIGHT = 20;
 
-export const createBoard = (): (string | number)[][] =>
-  Array.from({ length: BOARD_HEIGHT }, () => Array(BOARD_WIDTH).fill(0));
+export const createBoard = (): [string | number, string][][] =>
+  Array.from({ length: BOARD_HEIGHT }, () => 
+    Array(BOARD_WIDTH).fill([0, 'clear'])
+  );
 
 export const TETROMINOES: {
   [key: string]: { shape: (string | number)[][]; color: string };
@@ -71,3 +73,5 @@ export const randomTetromino = (): { shape: (string | number)[][]; color: string
   const randTetromino = tetrominos[Math.floor(Math.random() * tetrominos.length)];
   return TETROMINOES[randTetromino];
 };
+
+    

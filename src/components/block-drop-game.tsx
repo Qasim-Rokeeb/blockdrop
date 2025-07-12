@@ -50,11 +50,9 @@ export function BlockDropGame() {
           const newX = x + playerToCheck.pos.x + moveX;
 
           if (
-            !boardToCheck[newY] || // Check if the row exists
-            !boardToCheck[newY][newX] === undefined || // Check if the cell exists
-            newY >= BOARD_HEIGHT || // Check bottom boundary
-            newX < 0 || newX >= BOARD_WIDTH || // Check side boundaries
-            (boardToCheck[newY] && boardToCheck[newY][newX] !== 0) // Check for existing pieces
+            newY >= BOARD_HEIGHT || 
+            newX < 0 || newX >= BOARD_WIDTH ||
+            (boardToCheck[newY] && boardToCheck[newY][newX][0] !== 0)
           ) {
             return true;
           }
@@ -67,7 +65,7 @@ export function BlockDropGame() {
   const resetPlayer = useCallback(() => {
     const newTetromino = randomTetromino();
     const newPlayer = {
-      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
+      pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
       tetromino: newTetromino.shape,
       collided: false,
     };
@@ -86,33 +84,23 @@ export function BlockDropGame() {
     setScore(0);
     setRows(0);
     setLevel(0);
-    setDropTime(1000);
-    const newTetromino = randomTetromino();
-    const newPlayer = {
-      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
-      tetromino: newTetromino.shape,
-      collided: false,
-    };
-    if (checkCollision(newPlayer, newBoard, { x: 0, y: 0 })) {
-        setGameOver(true);
-        setDropTime(null);
-    } else {
-        setPlayer(newPlayer);
-    }
     setGameOver(false);
     setIsPaused(false);
-  }, [checkCollision]);
+    setDropTime(1000);
+    const newTetromino = randomTetromino();
+    setPlayer({
+      pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
+      tetromino: newTetromino.shape,
+      collided: false,
+    });
+  }, []);
 
   const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided?: boolean }): void => {
-    setPlayer(prev => {
-        const newPos = { x: prev.pos.x + x, y: prev.pos.y + y };
-        const newCollided = collided !== undefined ? collided : prev.collided;
-        return {
-            ...prev,
-            pos: newPos,
-            collided: newCollided,
-        }
-    });
+    setPlayer(prev => ({
+        ...prev,
+        pos: { x: prev.pos.x + x, y: prev.pos.y + y },
+        collided: collided !== undefined ? collided : prev.collided,
+    }));
   };
 
   const movePlayer = (dir: number) => {
@@ -130,13 +118,15 @@ export function BlockDropGame() {
     const clonedPlayer = JSON.parse(JSON.stringify(player));
     clonedPlayer.tetromino = rotate(clonedPlayer.tetromino);
 
-    const pos = clonedPlayer.pos.x;
     let offset = 1;
     while (checkCollision(clonedPlayer, board, { x: 0, y: 0 })) {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
       if (offset > clonedPlayer.tetromino[0].length) {
-        return; // Cannot rotate
+        // If it can't rotate back, revert to original rotation
+        clonedPlayer.tetromino = rotate(clonedPlayer.tetromino);
+        clonedPlayer.pos.x = player.pos.x; // reset position as well
+        return; 
       }
     }
     setPlayer(clonedPlayer);
@@ -168,41 +158,43 @@ export function BlockDropGame() {
 
   useEffect(() => {
     if (player.collided) {
-        setBoard(prevBoard => {
-            const newBoardState = JSON.parse(JSON.stringify(prevBoard));
-            player.tetromino.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        const boardY = y + player.pos.y;
-                        const boardX = x + player.pos.x;
-                        if (newBoardState[boardY]) {
-                            newBoardState[boardY][boardX] = value;
-                        }
+        const newBoard = JSON.parse(JSON.stringify(board));
+        player.tetromino.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    const boardY = y + player.pos.y;
+                    const boardX = x + player.pos.x;
+                    if (newBoard[boardY]) {
+                        newBoard[boardY][boardX] = [value, 'merged'];
                     }
-                });
-            });
-
-            let clearedRows = 0;
-            const sweptBoard = newBoardState.filter((row: (string|number)[]) => {
-                if (row.every(cell => cell !== 0)) {
-                    clearedRows++;
-                    return false;
                 }
-                return true;
             });
+        });
+
+        const sweepRows = (newBoard: BoardState) => {
+            let clearedRows = 0;
+            const sweptBoard = newBoard.reduce((ack, row) => {
+                if (row.every(cell => cell[0] !== 0)) {
+                    clearedRows++;
+                    ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+                    return ack;
+                }
+                ack.push(row);
+                return ack;
+            }, [] as BoardState);
             
             if (clearedRows > 0) {
                 setRows(prev => prev + clearedRows);
                 const linePoints = [40, 100, 300, 1200];
                 setScore(prev => prev + linePoints[clearedRows-1] * (level + 1));
-                const newRows = Array.from({length: clearedRows}, () => Array(BOARD_WIDTH).fill(0));
-                return [...newRows, ...sweptBoard];
             }
-            return newBoardState;
-        });
-      resetPlayer();
+            return sweptBoard;
+        }
+
+        setBoard(sweepRows(newBoard));
+        resetPlayer();
     }
-  }, [player.collided, level, resetPlayer]);
+  }, [player.collided, level, resetPlayer, board]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -225,7 +217,7 @@ export function BlockDropGame() {
     else if (e.key === 'ArrowDown') drop();
     else if (e.key === 'ArrowUp') playerRotate(board);
     else if (e.key === ' ') hardDrop();
-  }, [board, gameOver, isPaused, playerRotate, drop, hardDrop]);
+  }, [board, gameOver, isPaused, playerRotate, drop, hardDrop, movePlayer]);
   
   useInterval(() => {
     drop();
@@ -305,18 +297,18 @@ export function BlockDropGame() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 grid-rows-3 gap-2 md:hidden mt-4 w-full max-w-xs">
+      <div className="grid grid-cols-3 grid-rows-2 gap-2 md:hidden mt-4 w-full max-w-xs">
           <div className="col-start-2 row-start-1 flex justify-center">
-              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
+            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
           </div>
           <div className="col-start-1 row-start-2 flex justify-center">
-              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowLeft')} className="w-16 h-16"><ArrowLeft/></Button>
+            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowLeft')} className="w-16 h-16"><ArrowLeft/></Button>
           </div>
           <div className="col-start-2 row-start-2 flex justify-center">
-              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowDown')} className="w-16 h-16"><ArrowDown/></Button>
+            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowDown')} className="w-16 h-16"><ArrowDown/></Button>
           </div>
           <div className="col-start-3 row-start-2 flex justify-center">
-              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowRight')} className="w-16 h-16"><ArrowRight/></Button>
+            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowRight')} className="w-16 h-16"><ArrowRight/></Button>
           </div>
           <div className="col-span-3 row-start-3 mt-2">
               <Button onTouchStart={(e) => handleTouchStart(e, ' ')} className="w-full h-16 font-bold">DROP</Button>
@@ -325,3 +317,5 @@ export function BlockDropGame() {
     </div>
   );
 }
+
+    

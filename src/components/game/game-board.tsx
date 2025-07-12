@@ -20,7 +20,7 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, player }) => {
           const boardY = y + player.pos.y;
           const boardX = x + player.pos.x;
           if (displayBoard[boardY]) {
-             displayBoard[boardY][boardX] = value;
+             displayBoard[boardY][boardX] = [value, 'clear'];
           }
         }
       });
@@ -37,8 +37,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, player }) => {
         height: 'min(80vh, 600px)',
       }}
     >
-      {displayBoard.map((row: (string|number)[], y: number) =>
-        row.map((cell: string|number, x: number) => <Cell key={`${y}-${x}`} type={cell} />)
+      {displayBoard.map((row: [string|number, string][], y: number) =>
+        row.map((cell: [string|number, string], x: number) => <Cell key={`${y}-${x}`} type={cell[0]} />)
       )}
     </div>
   );
@@ -46,4 +46,4 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, player }) => {
 
 export default GameBoard;
 
-  
+    
