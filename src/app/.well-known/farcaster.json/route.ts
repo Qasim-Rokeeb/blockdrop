@@ -12,7 +12,7 @@ export async function GET() {
         version: "1",
         name: "BlockDrop",
         iconUrl: `https://blockdrop-nine.vercel.app/icon.png`,
-        homeUrl: appUrl,
+        homeUrl: 'https://blockdrop-nine.vercel.app',
         imageUrl: `https://blockdrop-nine.vercel.app/frames/hello/opengraph-image`,
         buttonTitle: "Launch Frame",
         splashImageUrl: `https://blockdrop-nine.vercel.app/splash.png`,
