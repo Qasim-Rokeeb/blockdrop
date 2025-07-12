@@ -1,4 +1,4 @@
-# 🎮 Block Dropp.
+# 🎮 Block Drop.
 
 This is a simple block dropping game built using Next.js, React, and Tailwind CSS, providing a basic implementation of the classic Tetris game.
 
