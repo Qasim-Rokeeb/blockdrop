@@ -47,9 +47,35 @@ export function BlockDropGame() {
 
   useEffect(() => {
     setIsClient(true);
-    // Set initial random pieces on client mount
-    setNextTetromino(randomTetromino());
   }, []);
+  
+  const startGame = useCallback(() => {
+    const newBoard = createBoard();
+    setBoard(newBoard);
+    setScore(0);
+    setRows(0);
+    setLevel(0);
+    setGameOver(false);
+    setIsPaused(false);
+    setDropTime(1000);
+    
+    // Generate pieces on start to avoid hydration issues
+    const firstTetromino = randomTetromino();
+    setNextTetromino(randomTetromino());
+    setPlayer({
+      pos: { x: BOARD_WIDTH / 2 - Math.ceil(firstTetromino.shape[0].length / 2), y: 0 },
+      tetromino: firstTetromino,
+      collided: false,
+    });
+  }, []);
+
+  useEffect(() => {
+    if(isClient && gameOver) {
+       // On initial load, set a valid "next" piece, but don't start the game.
+      setNextTetromino(randomTetromino());
+    }
+  }, [isClient, gameOver]);
+
 
   const checkCollision = useCallback((
     playerToCheck: Player,
@@ -91,25 +117,6 @@ export function BlockDropGame() {
       setPlayer(newPlayer);
     }
   }, [checkCollision, board, nextTetromino]);
-
-  const startGame = useCallback(() => {
-    const newBoard = createBoard();
-    setBoard(newBoard);
-    setScore(0);
-    setRows(0);
-    setLevel(0);
-    setGameOver(false);
-    setIsPaused(false);
-    setDropTime(1000);
-    
-    const firstTetromino = randomTetromino();
-    setNextTetromino(randomTetromino());
-    setPlayer({
-      pos: { x: BOARD_WIDTH / 2 - Math.ceil(firstTetromino.shape[0].length / 2), y: 0 },
-      tetromino: firstTetromino,
-      collided: false,
-    });
-  }, []);
 
   const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided?: boolean }): void => {
     setPlayer(prev => ({
@@ -173,39 +180,41 @@ export function BlockDropGame() {
 
   useEffect(() => {
     if (player.collided) {
-        setBoard(prevBoard => {
-            const newBoard = JSON.parse(JSON.stringify(prevBoard));
+        const newBoard = JSON.parse(JSON.stringify(board));
 
-            player.tetromino.shape.forEach((row, y) => {
-                row.forEach((value, x) => {
-                    if (value !== 0) {
-                        const boardY = y + player.pos.y;
-                        const boardX = x + player.pos.x;
-                        if (newBoard[boardY]) {
-                            newBoard[boardY][boardX] = [value, 'merged'];
-                        }
+        player.tetromino.shape.forEach((row, y) => {
+            row.forEach((value, x) => {
+                if (value !== 0) {
+                    const boardY = y + player.pos.y;
+                    const boardX = x + player.pos.x;
+                    if (newBoard[boardY]) {
+                        newBoard[boardY][boardX] = [value, 'merged'];
                     }
-                });
-            });
-
-            const sweptBoard: BoardState = newBoard.reduce((ack, row) => {
-                if (row.every(cell => cell[1] === 'merged')) {
-                    setRows(prev => prev + 1);
-                    const linePoints = [40, 100, 300, 1200];
-                    setScore(prev => prev + (linePoints[0] || 40) * (level + 1));
-                    ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
-                    return ack;
                 }
-                ack.push(row);
-                return ack;
-            }, [] as BoardState);
-            
-            return sweptBoard;
+            });
         });
 
+        let clearedRows = 0;
+        const sweptBoard = newBoard.reduce((ack: BoardState, row: (string|number)[][]) => {
+            if (row.every(cell => cell[1] === 'merged')) {
+                clearedRows++;
+                ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+                return ack;
+            }
+            ack.push(row);
+            return ack;
+        }, [] as BoardState);
+        
+        if (clearedRows > 0) {
+          const linePoints = [40, 100, 300, 1200];
+          setScore(prev => prev + (linePoints[clearedRows-1] || 0) * (level + 1));
+          setRows(prev => prev + clearedRows);
+        }
+        
+        setBoard(sweptBoard);
         resetPlayer();
     }
-  }, [player.collided, resetPlayer, level]);
+  }, [player.collided, resetPlayer, level, board]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -224,7 +233,10 @@ export function BlockDropGame() {
   },[board, drop, gameOver, isPaused, playerRotate]);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => move(e);
+    const handleKeyDown = (e: KeyboardEvent) => {
+        e.preventDefault();
+        move({key: e.key});
+    };
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
@@ -267,8 +279,8 @@ export function BlockDropGame() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full p-2 lg:p-4">
-      <Card className="w-full max-w-md lg:max-w-4xl mb-2 lg:mb-4 bg-card/80 backdrop-blur-sm border-white/10">
+    <div className="flex flex-col items-center justify-center w-full h-full p-2 md:p-4">
+      <Card className="w-full max-w-sm md:max-w-4xl mb-2 md:mb-4 bg-card/80 backdrop-blur-sm border-white/10">
         <CardContent className="flex flex-row justify-around gap-4 p-3">
           <StatusDisplay icon={<Trophy size={20}/>} label="Score" value={score} />
           <StatusDisplay icon={<Layers size={20}/>} label="Rows" value={rows} />
@@ -276,9 +288,9 @@ export function BlockDropGame() {
         </CardContent>
       </Card>
       
-      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full max-w-md lg:max-w-4xl">
-        <div className="flex-grow flex flex-col items-center w-full max-w-[25vh] sm:max-w-[40vh] lg:max-w-md">
-          <div className="relative w-full">
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-4 w-full max-w-sm md:max-w-4xl">
+        <div className="flex-grow flex flex-col items-center w-full">
+          <div className="relative w-full max-w-[80vw] sm:max-w-[40vh] md:max-w-none">
             <GameBoard board={board} player={player} />
             {gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
@@ -300,9 +312,9 @@ export function BlockDropGame() {
             )}
           </div>
         </div>
-        <div className="w-full lg:w-48 flex flex-col gap-4">
+        <div className="w-full md:w-48 flex flex-col gap-4">
           
-          <div className="lg:hidden flex flex-row gap-4 w-full">
+          <div className="md:hidden flex flex-row gap-4 w-full">
               <Card className="flex-1 bg-card/80 backdrop-blur-sm border-white/10">
                   <CardHeader>
                       <CardTitle className="text-lg text-center">Next</CardTitle>
@@ -331,7 +343,7 @@ export function BlockDropGame() {
               </div>
           </div>
 
-          <Card className="hidden lg:block bg-card/80 backdrop-blur-sm border-white/10">
+          <Card className="hidden md:block bg-card/80 backdrop-blur-sm border-white/10">
               <CardHeader>
                   <CardTitle className="text-lg">Next Piece</CardTitle>
               </CardHeader>
@@ -340,7 +352,7 @@ export function BlockDropGame() {
               </CardContent>
           </Card>
 
-          <div className="hidden lg:flex flex-col items-center justify-center gap-2">
+          <div className="hidden md:flex flex-col items-center justify-center gap-2">
             {gameOver ? (
               <Button onClick={startGame} size="lg" className="w-full">
                 <Play className="mr-2 h-4 w-4" /> Start Game
@@ -359,17 +371,20 @@ export function BlockDropGame() {
         </div>
       </div>
 
-      <div className="lg:hidden mt-4 w-full max-w-xs mx-auto">
+      <div className="md:hidden mt-4 w-full max-w-xs mx-auto">
         <div className="flex justify-between items-center">
             <div className="flex flex-col gap-2">
               <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
             </div>
             <div className="grid grid-cols-3 grid-rows-2 gap-2">
               <div className="col-start-2 row-start-1 flex justify-center">
-                <Button onClick={() => handleMobileInput('down')} className="w-16 h-16 rounded-full"><ArrowDown size={28}/></Button>
+                {/* Placeholder for up action if needed */}
               </div>
               <div className="col-start-1 row-start-2 flex justify-center">
                 <Button onClick={() => handleMobileInput('left')} className="w-16 h-16 rounded-full"><ArrowLeft size={28}/></Button>
+              </div>
+              <div className="col-start-2 row-start-2 flex justify-center">
+                <Button onClick={() => handleMobileInput('down')} className="w-16 h-16 rounded-full"><ArrowDown size={28}/></Button>
               </div>
               <div className="col-start-3 row-start-2 flex justify-center">
                 <Button onClick={() => handleMobileInput('right')} className="w-16 h-16 rounded-full"><ArrowRight size={28}/></Button>
@@ -383,5 +398,3 @@ export function BlockDropGame() {
     </div>
   );
 }
-
-    
