@@ -4,23 +4,26 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   BOARD_WIDTH,
-  BOARD_HEIGHT,
   createBoard,
   TETROMINOES,
   randomTetromino,
 } from '@/lib/tetris';
 import { useInterval } from '@/hooks/use-interval';
-import type { BoardState, Player, TetrominoShape } from '@/types/tetris';
+import type { BoardState, Player, Tetromino, TetrominoShape } from '@/types/tetris';
 
 import GameBoard from './game/game-board';
+import NextPiece from './game/next-piece';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Pause, Play, RefreshCw } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Pause, Play, RefreshCw, Star, Trophy, Layers } from 'lucide-react';
 
-const StatusDisplay: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
-  <div className="flex flex-col items-center">
-    <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="text-2xl font-bold text-primary">{value}</span>
+const StatusDisplay: React.FC<{ icon: React.ReactNode, label: string; value: number | string }> = ({ icon, label, value }) => (
+  <div className="flex items-center gap-4">
+    <div className="text-primary">{icon}</div>
+    <div className="flex flex-col">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-2xl font-bold text-foreground">{value}</span>
+    </div>
   </div>
 );
 
@@ -28,9 +31,10 @@ export function BlockDropGame() {
   const [board, setBoard] = useState<BoardState>(createBoard());
   const [player, setPlayer] = useState<Player>({
     pos: { x: 0, y: 0 },
-    tetromino: TETROMINOES[0].shape,
+    tetromino: { shape: TETROMINOES[0].shape, color: '' },
     collided: false,
   });
+  const [nextTetromino, setNextTetromino] = useState<Tetromino>(randomTetromino());
   const [score, setScore] = useState(0);
   const [rows, setRows] = useState(0);
   const [level, setLevel] = useState(0);
@@ -43,16 +47,16 @@ export function BlockDropGame() {
     boardToCheck: BoardState,
     { x: moveX, y: moveY }: { x: number; y: number }
   ): boolean => {
-    for (let y = 0; y < playerToCheck.tetromino.length; y += 1) {
-      for (let x = 0; x < playerToCheck.tetromino[y].length; x += 1) {
-        if (playerToCheck.tetromino[y][x] !== 0) {
+    for (let y = 0; y < playerToCheck.tetromino.shape.length; y += 1) {
+      for (let x = 0; x < playerToCheck.tetromino.shape[y].length; x += 1) {
+        if (playerToCheck.tetromino.shape[y][x] !== 0) {
           const newY = y + playerToCheck.pos.y + moveY;
           const newX = x + playerToCheck.pos.x + moveX;
-
           if (
-            newY >= BOARD_HEIGHT || 
+            !boardToCheck[newY] ||
+            !boardToCheck[newY][newX] ||
             newX < 0 || newX >= BOARD_WIDTH ||
-            (boardToCheck[newY] && boardToCheck[newY][newX][0] !== 0)
+            boardToCheck[newY][newX][1] === 'merged'
           ) {
             return true;
           }
@@ -63,20 +67,22 @@ export function BlockDropGame() {
   }, []);
   
   const resetPlayer = useCallback(() => {
-    const newTetromino = randomTetromino();
-    const newPlayer = {
+    const newTetromino = nextTetromino;
+    setNextTetromino(randomTetromino());
+
+    const newPlayer: Player = {
       pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
-      tetromino: newTetromino.shape,
+      tetromino: newTetromino,
       collided: false,
     };
     
-    if (checkCollision(newPlayer, createBoard(), { x: 0, y: 0 })) {
+    if (checkCollision(newPlayer, board, { x: 0, y: 0 })) {
       setGameOver(true);
       setDropTime(null);
     } else {
       setPlayer(newPlayer);
     }
-  }, [checkCollision]);
+  }, [checkCollision, board, nextTetromino]);
 
   const startGame = useCallback(() => {
     const newBoard = createBoard();
@@ -88,9 +94,10 @@ export function BlockDropGame() {
     setIsPaused(false);
     setDropTime(1000);
     const newTetromino = randomTetromino();
+    setNextTetromino(randomTetromino());
     setPlayer({
       pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
-      tetromino: newTetromino.shape,
+      tetromino: newTetromino,
       collided: false,
     });
   }, []);
@@ -116,13 +123,14 @@ export function BlockDropGame() {
 
   const playerRotate = useCallback((board: BoardState) => {
     const clonedPlayer = JSON.parse(JSON.stringify(player));
-    clonedPlayer.tetromino = rotate(clonedPlayer.tetromino);
+    clonedPlayer.tetromino.shape = rotate(clonedPlayer.tetromino.shape);
 
     let offset = 1;
     while (checkCollision(clonedPlayer, board, { x: 0, y: 0 })) {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
-      if (offset > clonedPlayer.tetromino[0].length + 1) {
+      if (offset > clonedPlayer.tetromino.shape[0].length) {
+        clonedPlayer.tetromino.shape = rotate(clonedPlayer.tetromino.shape); // Rotate back
         return; 
       }
     }
@@ -155,62 +163,52 @@ export function BlockDropGame() {
 
   useEffect(() => {
     if (player.collided) {
-        const newBoard = JSON.parse(JSON.stringify(board));
-        player.tetromino.forEach((row, y) => {
-            row.forEach((value, x) => {
-                if (value !== 0) {
-                    const boardY = y + player.pos.y;
-                    const boardX = x + player.pos.x;
-                    if (newBoard[boardY]) {
-                        newBoard[boardY][boardX] = [value, 'merged'];
+        setBoard(prevBoard => {
+            const newBoard = prevBoard.map(row =>
+                row.map(cell => (cell[1] === 'clear' ? [0, 'clear'] : cell))
+            );
+
+            player.tetromino.shape.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        const boardY = y + player.pos.y;
+                        const boardX = x + player.pos.x;
+                        if (newBoard[boardY]) {
+                            newBoard[boardY][boardX] = [value, 'merged'];
+                        }
+                    }
+                });
+            });
+
+            const sweepRows = (b: BoardState) => {
+                let clearedRowsCount = 0;
+                const sweptBoard: BoardState = [];
+
+                for (let y = b.length - 1; y >= 0; y--) {
+                    if (b[y].every(cell => cell[0] !== 0)) {
+                        clearedRowsCount++;
+                    } else {
+                        sweptBoard.unshift(b[y]);
                     }
                 }
-            });
+                for (let i = 0; i < clearedRowsCount; i++) {
+                    sweptBoard.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+                }
+                if (clearedRowsCount > 0) {
+                    setRows(prev => prev + clearedRowsCount);
+                    const linePoints = [40, 100, 300, 1200];
+                    setScore(prev => prev + linePoints[clearedRowsCount - 1] * (level + 1));
+                }
+                return sweptBoard;
+            };
+
+            const sweptBoard = sweepRows(newBoard);
+            return sweptBoard;
         });
 
-        const sweepRows = (b: BoardState) => {
-            let clearedRows = 0;
-            const sweptBoard: BoardState = [];
-
-            for (let y = b.length - 1; y >= 0; y--) {
-                const row = b[y];
-                if (row.every(cell => cell[0] !== 0)) {
-                    clearedRows++;
-                } else {
-                    sweptBoard.unshift(row);
-                }
-            }
-
-            for (let i = 0; i < clearedRows; i++) {
-                sweptBoard.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
-            }
-
-            if (clearedRows > 0) {
-                setRows(prev => prev + clearedRows);
-                const linePoints = [40, 100, 300, 1200];
-                setScore(prev => prev + linePoints[clearedRows-1] * (level + 1));
-            }
-            return sweptBoard;
-        }
-
-        const sweptBoard = sweepRows(newBoard);
-        setBoard(sweptBoard);
-
-        const newTetromino = randomTetromino();
-        const newPlayer = {
-            pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
-            tetromino: newTetromino.shape,
-            collided: false,
-        };
-
-        if (checkCollision(newPlayer, sweptBoard, { x: 0, y: 0 })) {
-            setGameOver(true);
-            setDropTime(null);
-        } else {
-            setPlayer(newPlayer);
-        }
+        resetPlayer();
     }
-  }, [player.collided, level, board, checkCollision]);
+}, [player.collided, level, resetPlayer]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -226,7 +224,7 @@ export function BlockDropGame() {
     }
   }, [level, isPaused, gameOver]);
   
-  const move = useCallback((e: React.KeyboardEvent | { key: string }) => {
+  const move = useCallback((e: KeyboardEvent | { key: string }) => {
     if (gameOver || isPaused) return;
     if (e.key === 'ArrowLeft') movePlayer(-1);
     else if (e.key === 'ArrowRight') movePlayer(1);
@@ -234,6 +232,14 @@ export function BlockDropGame() {
     else if (e.key === 'ArrowUp') playerRotate(board);
     else if (e.key === ' ') hardDrop();
   }, [board, gameOver, isPaused, playerRotate, drop, hardDrop, movePlayer]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => move(e);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [move]);
   
   useInterval(() => {
     drop();
@@ -267,78 +273,85 @@ export function BlockDropGame() {
   }
 
   return (
-    <div 
-      className="flex flex-col items-center gap-4 outline-none" 
-      role="button" 
-      tabIndex={0} 
-      onKeyDown={move}
-      autoFocus
-    >
-      <Card className="bg-card/50 backdrop-blur-sm border-white/20">
-        <CardContent className="p-4">
-          <div className="flex justify-around gap-6 text-center">
-            <StatusDisplay label="Score" value={score} />
-            <StatusDisplay label="Rows" value={rows} />
-            <StatusDisplay label="Level" value={level} />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="relative">
-        <GameBoard board={board} player={player} />
-        {gameOver && !player.collided && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
-            <h2 className="text-3xl font-bold text-white">Game Over</h2>
-            <Button onClick={startGame} className="mt-4" variant="secondary">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Play Again
-            </Button>
-          </div>
-        )}
-        {isPaused && !gameOver && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
-            <h2 className="text-3xl font-bold text-white">Paused</h2>
-            <Button onClick={togglePause} className="mt-4" variant="secondary">
-              <Play className="mr-2 h-4 w-4" />
-              Resume
-            </Button>
-          </div>
-        )}
+    <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 w-full max-w-5xl">
+      <div className="flex-1 w-full flex flex-col items-center">
+        <div className="relative">
+          <GameBoard board={board} player={player} />
+          {gameOver && !player.collided && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
+              <h2 className="text-3xl font-bold text-white">Game Over</h2>
+              <Button onClick={startGame} className="mt-4" variant="secondary">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Play Again
+              </Button>
+            </div>
+          )}
+          {isPaused && !gameOver && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
+              <h2 className="text-3xl font-bold text-white">Paused</h2>
+              <Button onClick={togglePause} className="mt-4" variant="secondary">
+                <Play className="mr-2 h-4 w-4" />
+                Resume
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
+      <div className="w-full lg:w-64 flex flex-col gap-4">
+        <Card className="bg-card/80 backdrop-blur-sm border-white/10">
+          <CardHeader>
+            <CardTitle className="text-lg">Game Stats</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <StatusDisplay icon={<Trophy size={24}/>} label="Score" value={score} />
+            <StatusDisplay icon={<Layers size={24}/>} label="Rows" value={rows} />
+            <StatusDisplay icon={<Star size={24}/>} label="Level" value={level} />
+          </CardContent>
+        </Card>
+        
+        <Card className="bg-card/80 backdrop-blur-sm border-white/10">
+            <CardHeader>
+                <CardTitle className="text-lg">Next Piece</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <NextPiece tetromino={nextTetromino} />
+            </CardContent>
+        </Card>
 
-      <div className="flex items-center gap-2">
-        {gameOver ? (
-           <Button onClick={startGame} size="lg">
-            <Play className="mr-2 h-4 w-4" /> Start Game
-          </Button>
-        ) : (
-          <>
-            <Button onClick={togglePause} variant="secondary">
-              {isPaused ? <Play/> : <Pause/>}
+        <div className="flex items-center justify-center gap-2">
+          {gameOver ? (
+            <Button onClick={startGame} size="lg" className="w-full">
+              <Play className="mr-2 h-4 w-4" /> Start Game
             </Button>
-            <Button onClick={startGame} variant="secondary">
-              <RefreshCw />
-            </Button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <Button onClick={togglePause} variant="secondary" className="flex-1">
+                {isPaused ? <Play/> : <Pause/>}
+              </Button>
+              <Button onClick={startGame} variant="secondary" className="flex-1">
+                <RefreshCw /> Restart
+              </Button>
+            </>
+          )}
+        </div>
 
-      <div className="grid grid-cols-3 grid-rows-3 gap-2 md:hidden mt-4 w-full max-w-xs">
-          <div className="col-start-2 row-start-1 flex justify-center">
-            <Button onClick={() => handleMobileInput('rotate')} className="w-16 h-16"><ArrowUp/></Button>
-          </div>
-          <div className="col-start-1 row-start-2 flex justify-center">
-            <Button onClick={() => handleMobileInput('left')} className="w-16 h-16"><ArrowLeft/></Button>
-          </div>
-          <div className="col-start-2 row-start-2 flex justify-center">
-            <Button onClick={() => handleMobileInput('down')} className="w-16 h-16"><ArrowDown/></Button>
-          </div>
-          <div className="col-start-3 row-start-2 flex justify-center">
-            <Button onClick={() => handleMobileInput('right')} className="w-16 h-16"><ArrowRight/></Button>
-          </div>
-          <div className="col-span-3 row-start-3 mt-2">
-              <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold">DROP</Button>
-          </div>
+        <div className="grid grid-cols-3 grid-rows-3 gap-2 lg:hidden mt-4 w-full max-w-xs mx-auto">
+            <div className="col-start-2 row-start-1 flex justify-center">
+              <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
+            </div>
+            <div className="col-start-1 row-start-2 flex justify-center">
+              <Button onClick={() => handleMobileInput('left')} className="w-20 h-20 rounded-full"><ArrowLeft size={32}/></Button>
+            </div>
+            <div className="col-start-2 row-start-2 flex justify-center">
+              <Button onClick={() => handleMobileInput('down')} className="w-20 h-20 rounded-full"><ArrowDown size={32}/></Button>
+            </div>
+            <div className="col-start-3 row-start-2 flex justify-center">
+              <Button onClick={() => handleMobileInput('right')} className="w-20 h-20 rounded-full"><ArrowRight size={32}/></Button>
+            </div>
+            <div className="col-span-3 row-start-3 mt-2">
+                <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold text-lg">DROP</Button>
+            </div>
+        </div>
       </div>
     </div>
   );

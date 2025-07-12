@@ -1,3 +1,5 @@
+import type { Tetromino } from '@/types/tetris';
+
 export const BOARD_WIDTH = 10;
 export const BOARD_HEIGHT = 20;
 
@@ -7,9 +9,9 @@ export const createBoard = (): [string | number, string][][] =>
   );
 
 export const TETROMINOES: {
-  [key: string]: { shape: (string | number)[][]; color: string };
+  [key: string]: Tetromino;
 } = {
-  '0': { shape: [[0]], color: 'rgba(51, 51, 51, 0.8)' }, // Empty cell color with some transparency
+  '0': { shape: [[0]], color: 'rgba(21, 21, 41, 0.8)' },
   I: {
     shape: [
       [0, 'I', 0, 0],
@@ -68,10 +70,8 @@ export const TETROMINOES: {
   },
 };
 
-export const randomTetromino = (): { shape: (string | number)[][]; color: string; } => {
+export const randomTetromino = (): Tetromino => {
   const tetrominos = 'IJLOSTZ';
   const randTetromino = tetrominos[Math.floor(Math.random() * tetrominos.length)];
   return TETROMINOES[randTetromino];
 };
-
-    

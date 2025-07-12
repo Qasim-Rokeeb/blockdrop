@@ -19,15 +19,11 @@ const Cell: React.FC<CellProps> = ({ type }) => {
       style={{ 
         backgroundColor: color,
         boxShadow: isFilled 
-          ? 'inset 1px 1px 2px rgba(255, 255, 255, 0.2), inset -1px -1px 2px rgba(0, 0, 0, 0.3)' 
+          ? `inset 2px 2px 4px rgba(255, 255, 255, 0.2), inset -2px -2px 4px rgba(0, 0, 0, 0.4)`
           : 'none',
-        borderRight: '1px solid rgba(0,0,0,0.1)',
-        borderBottom: '1px solid rgba(0,0,0,0.1)',
        }}
     ></div>
   );
 };
 
 export default React.memo(Cell);
-
-  
