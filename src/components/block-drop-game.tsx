@@ -38,25 +38,7 @@ export function BlockDropGame() {
   const [gameOver, setGameOver] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
 
-  const resetPlayer = useCallback(() => {
-    const newTetromino = randomTetromino();
-    const newPlayer = {
-      pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
-      tetromino: newTetromino.shape,
-      collided: false,
-    };
-    
-    // Check if the new piece collides immediately. If so, game over.
-    if (checkCollision(newPlayer, board, { x: 0, y: 0 })) {
-      setGameOver(true);
-      setDropTime(null);
-    } else {
-      setPlayer(newPlayer);
-    }
-
-  }, [board]); // Added board dependency
-  
-  const checkCollision = (
+  const checkCollision = useCallback((
     playerToCheck: Player,
     boardToCheck: BoardState,
     { x: moveX, y: moveY }: { x: number; y: number }
@@ -68,6 +50,8 @@ export function BlockDropGame() {
           const newX = x + playerToCheck.pos.x + moveX;
 
           if (
+            !boardToCheck[newY] || // Check if the row exists
+            !boardToCheck[newY][newX] === undefined || // Check if the cell exists
             newY >= BOARD_HEIGHT || // Check bottom boundary
             newX < 0 || newX >= BOARD_WIDTH || // Check side boundaries
             (boardToCheck[newY] && boardToCheck[newY][newX] !== 0) // Check for existing pieces
@@ -78,35 +62,62 @@ export function BlockDropGame() {
       }
     }
     return false;
-  };
+  }, []);
+  
+  const resetPlayer = useCallback(() => {
+    const newTetromino = randomTetromino();
+    const newPlayer = {
+      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
+      tetromino: newTetromino.shape,
+      collided: false,
+    };
+    
+    if (checkCollision(newPlayer, board, { x: 0, y: 0 })) {
+      setGameOver(true);
+      setDropTime(null);
+    } else {
+      setPlayer(newPlayer);
+    }
+  }, [board, checkCollision]);
 
   const startGame = useCallback(() => {
-    setBoard(createBoard());
+    const newBoard = createBoard();
+    setBoard(newBoard);
     setScore(0);
     setRows(0);
     setLevel(0);
     setDropTime(1000);
     const newTetromino = randomTetromino();
-    setPlayer({
-        pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
-        tetromino: newTetromino.shape,
-        collided: false,
-    });
+    const newPlayer = {
+      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
+      tetromino: newTetromino.shape,
+      collided: false,
+    };
+    if (checkCollision(newPlayer, newBoard, { x: 0, y: 0 })) {
+        setGameOver(true);
+        setDropTime(null);
+    } else {
+        setPlayer(newPlayer);
+    }
     setGameOver(false);
     setIsPaused(false);
-  }, []);
+  }, [checkCollision]);
 
-  const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided: boolean }): void => {
-    setPlayer(prev => ({
-      ...prev,
-      pos: { x: (prev.pos.x += x), y: (prev.pos.y += y) },
-      collided,
-    }));
+  const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided?: boolean }): void => {
+    setPlayer(prev => {
+        const newPos = { x: prev.pos.x + x, y: prev.pos.y + y };
+        const newCollided = collided !== undefined ? collided : prev.collided;
+        return {
+            ...prev,
+            pos: newPos,
+            collided: newCollided,
+        }
+    });
   };
 
   const movePlayer = (dir: number) => {
     if (!checkCollision(player, board, { x: dir, y: 0 })) {
-      updatePlayerPos({ x: dir, y: 0, collided: false });
+      updatePlayerPos({ x: dir, y: 0 });
     }
   };
 
@@ -125,10 +136,7 @@ export function BlockDropGame() {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
       if (offset > clonedPlayer.tetromino[0].length) {
-         // Revert rotation if it's not possible
-        clonedPlayer.tetromino = rotate(rotate(rotate(clonedPlayer.tetromino)));
-        clonedPlayer.pos.x = pos; // Reset position
-        return;
+        return; // Cannot rotate
       }
     }
     setPlayer(clonedPlayer);
@@ -138,7 +146,7 @@ export function BlockDropGame() {
     if (isPaused || gameOver) return;
 
     if (!checkCollision(player, board, { x: 0, y: 1 })) {
-      updatePlayerPos({ x: 0, y: 1, collided: false });
+      updatePlayerPos({ x: 0, y: 1 });
     } else {
       if (player.pos.y < 1) {
         setGameOver(true);
@@ -160,39 +168,41 @@ export function BlockDropGame() {
 
   useEffect(() => {
     if (player.collided) {
-      const newBoardState = JSON.parse(JSON.stringify(board));
-      player.tetromino.forEach((row, y) => {
-        row.forEach((value, x) => {
-          if (value !== 0) {
-            newBoardState[y + player.pos.y][x + player.pos.x] = value;
-          }
+        setBoard(prevBoard => {
+            const newBoardState = JSON.parse(JSON.stringify(prevBoard));
+            player.tetromino.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value !== 0) {
+                        const boardY = y + player.pos.y;
+                        const boardX = x + player.pos.x;
+                        if (newBoardState[boardY]) {
+                            newBoardState[boardY][boardX] = value;
+                        }
+                    }
+                });
+            });
+
+            let clearedRows = 0;
+            const sweptBoard = newBoardState.filter((row: (string|number)[]) => {
+                if (row.every(cell => cell !== 0)) {
+                    clearedRows++;
+                    return false;
+                }
+                return true;
+            });
+            
+            if (clearedRows > 0) {
+                setRows(prev => prev + clearedRows);
+                const linePoints = [40, 100, 300, 1200];
+                setScore(prev => prev + linePoints[clearedRows-1] * (level + 1));
+                const newRows = Array.from({length: clearedRows}, () => Array(BOARD_WIDTH).fill(0));
+                return [...newRows, ...sweptBoard];
+            }
+            return newBoardState;
         });
-      });
-      
-      const sweptBoard: BoardState = [];
-      let clearedRows = 0;
-      for (let y = newBoardState.length - 1; y >= 0; y--) {
-        if (newBoardState[y].every(cell => cell !== 0)) {
-          clearedRows++;
-        } else {
-          sweptBoard.unshift(newBoardState[y]);
-        }
-      }
-
-      if (clearedRows > 0) {
-        setRows(prev => prev + clearedRows);
-        const linePoints = [40, 100, 300, 1200];
-        setScore(prev => prev + linePoints[clearedRows-1] * (level + 1));
-        
-        const newRows = Array.from({length: clearedRows}, () => Array(BOARD_WIDTH).fill(0));
-        setBoard([...newRows, ...sweptBoard]);
-      } else {
-        setBoard(newBoardState);
-      }
-
       resetPlayer();
     }
-  }, [player.collided, board, level, resetPlayer]);
+  }, [player.collided, level, resetPlayer]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -209,14 +219,13 @@ export function BlockDropGame() {
   }, [level, isPaused, gameOver]);
   
   const move = useCallback((e: React.KeyboardEvent | { key: string }) => {
-    if (!gameOver && !isPaused) {
-      if (e.key === 'ArrowLeft') movePlayer(-1);
-      else if (e.key === 'ArrowRight') movePlayer(1);
-      else if (e.key === 'ArrowDown') drop();
-      else if (e.key === 'ArrowUp') playerRotate(board);
-      else if (e.key === ' ') hardDrop();
-    }
-  }, [board, gameOver, isPaused]); // memoize move handler
+    if (gameOver || isPaused) return;
+    if (e.key === 'ArrowLeft') movePlayer(-1);
+    else if (e.key === 'ArrowRight') movePlayer(1);
+    else if (e.key === 'ArrowDown') drop();
+    else if (e.key === 'ArrowUp') playerRotate(board);
+    else if (e.key === ' ') hardDrop();
+  }, [board, gameOver, isPaused, playerRotate, drop, hardDrop]);
   
   useInterval(() => {
     drop();
@@ -234,6 +243,11 @@ export function BlockDropGame() {
     }
   }
 
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>, key: string) => {
+    e.preventDefault();
+    handleMobileInput(key);
+  };
+  
   return (
     <div 
       className="flex flex-col items-center gap-4 outline-none" 
@@ -291,21 +305,21 @@ export function BlockDropGame() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 grid-rows-2 gap-2 md:hidden mt-4 w-full max-w-xs">
+      <div className="grid grid-cols-3 grid-rows-3 gap-2 md:hidden mt-4 w-full max-w-xs">
           <div className="col-start-2 row-start-1 flex justify-center">
-            <Button onTouchStart={() => handleMobileInput('ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
+              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
           </div>
-          <div className="row-start-2 flex justify-center">
-            <Button onTouchStart={() => handleMobileInput('ArrowLeft')} className="w-16 h-16"><ArrowLeft/></Button>
+          <div className="col-start-1 row-start-2 flex justify-center">
+              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowLeft')} className="w-16 h-16"><ArrowLeft/></Button>
           </div>
-          <div className="row-start-2 flex justify-center">
-            <Button onTouchStart={() => handleMobileInput('ArrowDown')} className="w-16 h-16"><ArrowDown/></Button>
+          <div className="col-start-2 row-start-2 flex justify-center">
+              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowDown')} className="w-16 h-16"><ArrowDown/></Button>
           </div>
-          <div className="row-start-2 flex justify-center">
-            <Button onTouchStart={() => handleMobileInput('ArrowRight')} className="w-16 h-16"><ArrowRight/></Button>
+          <div className="col-start-3 row-start-2 flex justify-center">
+              <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowRight')} className="w-16 h-16"><ArrowRight/></Button>
           </div>
-          <div className="col-span-3 mt-2">
-            <Button onTouchStart={() => handleMobileInput(' ')} className="w-full h-16 font-bold">DROP</Button>
+          <div className="col-span-3 row-start-3 mt-2">
+              <Button onTouchStart={(e) => handleTouchStart(e, ' ')} className="w-full h-16 font-bold">DROP</Button>
           </div>
       </div>
     </div>
