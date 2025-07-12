@@ -18,11 +18,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Pause, Play, RefreshCw, Star, Trophy, Layers } from 'lucide-react';
 
 const StatusDisplay: React.FC<{ icon: React.ReactNode, label: string; value: number | string }> = ({ icon, label, value }) => (
-  <div className="flex items-center gap-4">
+  <div className="flex items-center gap-2">
     <div className="text-primary">{icon}</div>
-    <div className="flex flex-col">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-2xl font-bold text-foreground">{value}</span>
+    <div className="flex flex-col text-center lg:text-left">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-lg font-bold text-foreground">{value}</span>
     </div>
   </div>
 );
@@ -110,18 +110,18 @@ export function BlockDropGame() {
     }));
   };
 
-  const movePlayer = useCallback((dir: number) => {
+  const movePlayer = (dir: number) => {
     if (!checkCollision(player, board, { x: dir, y: 0 })) {
       updatePlayerPos({ x: dir, y: 0 });
     }
-  }, [player, board, checkCollision]);
+  };
 
   const rotate = (matrix: TetrominoShape): TetrominoShape => {
     const rotated = matrix.map((_, index) => matrix.map(col => col[index]));
     return rotated.map(row => row.reverse());
   };
 
-  const playerRotate = useCallback((board: BoardState) => {
+  const playerRotate = (board: BoardState) => {
     const clonedPlayer = JSON.parse(JSON.stringify(player));
     clonedPlayer.tetromino.shape = rotate(clonedPlayer.tetromino.shape);
 
@@ -135,7 +135,7 @@ export function BlockDropGame() {
       }
     }
     setPlayer(clonedPlayer);
-  }, [player, checkCollision]);
+  };
   
   const drop = useCallback(() => {
     if (isPaused || gameOver) return;
@@ -152,14 +152,14 @@ export function BlockDropGame() {
     }
   }, [isPaused, gameOver, player, board, checkCollision, updatePlayerPos]);
   
-  const hardDrop = useCallback(() => {
+  const hardDrop = () => {
     if (isPaused || gameOver) return;
     let dropY = 0;
     while (!checkCollision(player, board, { x: 0, y: dropY + 1 })) {
       dropY++;
     }
     updatePlayerPos({ x: 0, y: dropY, collided: true });
-  }, [isPaused, gameOver, player, board, checkCollision, updatePlayerPos]);
+  };
 
   useEffect(() => {
     if (player.collided) {
@@ -224,14 +224,14 @@ export function BlockDropGame() {
     }
   }, [level, isPaused, gameOver]);
   
-  const move = useCallback((e: { key: string }) => {
+  const move = (e: { key: string }) => {
     if (gameOver || isPaused) return;
     if (e.key === 'ArrowLeft') movePlayer(-1);
     else if (e.key === 'ArrowRight') movePlayer(1);
     else if (e.key === 'ArrowDown') drop();
     else if (e.key === 'ArrowUp') playerRotate(board);
     else if (e.key === ' ') hardDrop();
-  }, [board, gameOver, isPaused, playerRotate, drop, hardDrop, movePlayer]);
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => move(e);
@@ -255,138 +255,136 @@ export function BlockDropGame() {
     if (gameOver || isPaused) return;
     switch(action) {
       case 'left':
-        move({ key: 'ArrowLeft' });
+        movePlayer(-1);
         break;
       case 'right':
-        move({ key: 'ArrowRight' });
+        movePlayer(1);
         break;
       case 'down':
-        move({ key: 'ArrowDown' });
+        drop();
         break;
       case 'rotate':
-        move({ key: 'ArrowUp' });
+        playerRotate(board);
         break;
       case 'drop':
-        move({ key: ' ' });
+        hardDrop();
         break;
     }
   }
 
   return (
-    <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 w-full max-w-5xl">
-      <div className="w-full flex flex-col items-center">
-        <div className="relative">
-          <GameBoard board={board} player={player} />
-          {gameOver && !player.collided && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
-              <h2 className="text-3xl font-bold text-white">Game Over</h2>
-              <Button onClick={startGame} className="mt-4" variant="secondary">
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Play Again
+    <div className="flex flex-col items-center justify-center w-full max-w-5xl h-full lg:h-auto">
+      <Card className="w-full max-w-sm lg:max-w-none lg:w-auto mb-4 bg-card/80 backdrop-blur-sm border-white/10">
+        <CardContent className="flex flex-row justify-around gap-4 p-3">
+          <StatusDisplay icon={<Trophy size={20}/>} label="Score" value={score} />
+          <StatusDisplay icon={<Layers size={20}/>} label="Rows" value={rows} />
+          <StatusDisplay icon={<Star size={20}/>} label="Level" value={level} />
+        </CardContent>
+      </Card>
+      
+      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full">
+        <div className="flex-grow flex flex-col items-center">
+          <div className="relative">
+            <GameBoard board={board} player={player} />
+            {gameOver && !player.collided && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
+                <h2 className="text-3xl font-bold text-white">Game Over</h2>
+                <Button onClick={startGame} className="mt-4" variant="secondary">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Play Again
+                </Button>
+              </div>
+            )}
+            {isPaused && !gameOver && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
+                <h2 className="text-3xl font-bold text-white">Paused</h2>
+                <Button onClick={togglePause} className="mt-4" variant="secondary">
+                  <Play className="mr-2 h-4 w-4" />
+                  Resume
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="w-full lg:w-48 flex flex-col gap-4">
+          
+          <div className="lg:hidden flex flex-row gap-4 w-full">
+              <Card className="flex-1 bg-card/80 backdrop-blur-sm border-white/10">
+                  <CardHeader>
+                      <CardTitle className="text-lg text-center">Next</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <NextPiece tetromino={nextTetromino} />
+                  </CardContent>
+              </Card>
+              <div className="flex-1 flex items-center justify-center">
+                  <div className="flex items-center justify-center gap-2">
+                  {gameOver ? (
+                      <Button onClick={startGame} size="lg" className="w-full">
+                      <Play className="mr-2 h-4 w-4" /> Start
+                      </Button>
+                  ) : (
+                      <>
+                      <Button onClick={togglePause} variant="secondary" className="flex-1 aspect-square h-14">
+                          {isPaused ? <Play/> : <Pause/>}
+                      </Button>
+                      <Button onClick={startGame} variant="secondary" className="flex-1 aspect-square h-14">
+                          <RefreshCw />
+                      </Button>
+                      </>
+                  )}
+                  </div>
+              </div>
+          </div>
+
+          <Card className="hidden lg:block bg-card/80 backdrop-blur-sm border-white/10">
+              <CardHeader>
+                  <CardTitle className="text-lg">Next Piece</CardTitle>
+              </CardHeader>
+              <CardContent>
+                  <NextPiece tetromino={nextTetromino} />
+              </CardContent>
+          </Card>
+
+          <div className="hidden lg:flex flex-col items-center justify-center gap-2">
+            {gameOver ? (
+              <Button onClick={startGame} size="lg" className="w-full">
+                <Play className="mr-2 h-4 w-4" /> Start Game
               </Button>
-            </div>
-          )}
-          {isPaused && !gameOver && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
-              <h2 className="text-3xl font-bold text-white">Paused</h2>
-              <Button onClick={togglePause} className="mt-4" variant="secondary">
-                <Play className="mr-2 h-4 w-4" />
-                Resume
-              </Button>
-            </div>
-          )}
+            ) : (
+              <div className="w-full flex gap-2">
+                <Button onClick={togglePause} variant="secondary" className="flex-1">
+                  {isPaused ? <Play/> : <Pause/>}
+                </Button>
+                <Button onClick={startGame} variant="secondary" className="flex-1">
+                  <RefreshCw /> 
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-      <div className="w-full lg:w-64 flex flex-col gap-4">
-        
-        <div className="lg:hidden flex flex-row gap-4 w-full">
-            <Card className="flex-1 bg-card/80 backdrop-blur-sm border-white/10">
-                <CardHeader>
-                    <CardTitle className="text-lg text-center">Next</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <NextPiece tetromino={nextTetromino} />
-                </CardContent>
-            </Card>
-            <div className="flex-1 flex items-center justify-center">
-                <div className="flex items-center justify-center gap-2">
-                {gameOver ? (
-                    <Button onClick={startGame} size="lg" className="w-full">
-                    <Play className="mr-2 h-4 w-4" /> Start
-                    </Button>
-                ) : (
-                    <>
-                    <Button onClick={togglePause} variant="secondary" className="flex-1 aspect-square h-14">
-                        {isPaused ? <Play/> : <Pause/>}
-                    </Button>
-                    <Button onClick={startGame} variant="secondary" className="flex-1 aspect-square h-14">
-                        <RefreshCw />
-                    </Button>
-                    </>
-                )}
-                </div>
+
+      <div className="lg:hidden mt-4 w-full max-w-xs mx-auto">
+        <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
+            </div>
+            <div className="grid grid-cols-3 grid-rows-2 gap-2">
+              <div className="col-start-2 row-start-1 flex justify-center">
+                <Button onClick={() => handleMobileInput('down')} className="w-16 h-16 rounded-full"><ArrowDown size={28}/></Button>
+              </div>
+              <div className="col-start-1 row-start-2 flex justify-center">
+                <Button onClick={() => handleMobileInput('left')} className="w-16 h-16 rounded-full"><ArrowLeft size={28}/></Button>
+              </div>
+              <div className="col-start-3 row-start-2 flex justify-center">
+                <Button onClick={() => handleMobileInput('right')} className="w-16 h-16 rounded-full"><ArrowRight size={28}/></Button>
+              </div>
             </div>
         </div>
-
-        <Card className="bg-card/80 backdrop-blur-sm border-white/10">
-          <CardHeader className="hidden lg:flex">
-            <CardTitle className="text-lg">Game Stats</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-row lg:flex-col justify-around lg:justify-start gap-4 p-4 lg:p-6 lg:pt-0">
-            <StatusDisplay icon={<Trophy size={24}/>} label="Score" value={score} />
-            <StatusDisplay icon={<Layers size={24}/>} label="Rows" value={rows} />
-            <StatusDisplay icon={<Star size={24}/>} label="Level" value={level} />
-          </CardContent>
-        </Card>
-        
-        <Card className="hidden lg:block bg-card/80 backdrop-blur-sm border-white/10">
-            <CardHeader>
-                <CardTitle className="text-lg">Next Piece</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <NextPiece tetromino={nextTetromino} />
-            </CardContent>
-        </Card>
-
-        <div className="hidden lg:flex items-center justify-center gap-2">
-          {gameOver ? (
-            <Button onClick={startGame} size="lg" className="w-full">
-              <Play className="mr-2 h-4 w-4" /> Start Game
-            </Button>
-          ) : (
-            <>
-              <Button onClick={togglePause} variant="secondary" className="flex-1">
-                {isPaused ? <Play/> : <Pause/>}
-              </Button>
-              <Button onClick={startGame} variant="secondary" className="flex-1">
-                <RefreshCw /> Restart
-              </Button>
-            </>
-          )}
+        <div className="mt-4">
+            <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold text-lg">DROP</Button>
         </div>
-        
-        <div className="lg:hidden mt-4 w-full max-w-xs mx-auto">
-            <div className="flex justify-between items-center">
-                 <div className="flex flex-col gap-2">
-                    <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
-                 </div>
-                 <div className="grid grid-cols-3 grid-rows-2 gap-2">
-                    <div className="col-start-2 row-start-1 flex justify-center">
-                      <Button onClick={() => handleMobileInput('down')} className="w-16 h-16 rounded-full"><ArrowDown size={28}/></Button>
-                    </div>
-                    <div className="col-start-1 row-start-2 flex justify-center">
-                      <Button onClick={() => handleMobileInput('left')} className="w-16 h-16 rounded-full"><ArrowLeft size={28}/></Button>
-                    </div>
-                    <div className="col-start-3 row-start-2 flex justify-center">
-                      <Button onClick={() => handleMobileInput('right')} className="w-16 h-16 rounded-full"><ArrowRight size={28}/></Button>
-                    </div>
-                 </div>
-            </div>
-            <div className="mt-4">
-                <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold text-lg">DROP</Button>
-            </div>
-        </div>
-
       </div>
     </div>
   );

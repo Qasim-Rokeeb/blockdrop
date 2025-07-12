@@ -31,8 +31,8 @@ const GameBoard: React.FC<GameBoardProps> = ({ board, player }) => {
       style={{
         gridTemplateColumns: `repeat(${board[0].length}, 1fr)`,
         gridTemplateRows: `repeat(${board.length}, 1fr)`,
-        width: 'min(40vh, 300px)',
-        height: 'min(80vh, 600px)',
+        width: 'min(45vh, 350px)',
+        height: 'min(90vh, 700px)',
       }}
     >
       {displayBoard.map((row: [string|number, string][], y: number) =>
