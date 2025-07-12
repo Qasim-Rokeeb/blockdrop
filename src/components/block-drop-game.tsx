@@ -27,20 +27,29 @@ const StatusDisplay: React.FC<{ icon: React.ReactNode, label: string; value: num
   </div>
 );
 
+const initialPlayerState: Player = {
+  pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
+  tetromino: TETROMINOES[0],
+  collided: false,
+};
+
 export function BlockDropGame() {
   const [board, setBoard] = useState<BoardState>(createBoard());
-  const [player, setPlayer] = useState<Player>({
-    pos: { x: 0, y: 0 },
-    tetromino: { shape: TETROMINOES[0].shape, color: '' },
-    collided: false,
-  });
-  const [nextTetromino, setNextTetromino] = useState<Tetromino>(randomTetromino());
+  const [player, setPlayer] = useState<Player>(initialPlayerState);
+  const [nextTetromino, setNextTetromino] = useState<Tetromino>(TETROMINOES[0]);
   const [score, setScore] = useState(0);
   const [rows, setRows] = useState(0);
   const [level, setLevel] = useState(0);
   const [dropTime, setDropTime] = useState<number | null>(null);
   const [gameOver, setGameOver] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    // Set initial random pieces on client mount
+    setNextTetromino(randomTetromino());
+  }, []);
 
   const checkCollision = useCallback((
     playerToCheck: Player,
@@ -92,13 +101,14 @@ export function BlockDropGame() {
     setGameOver(false);
     setIsPaused(false);
     setDropTime(1000);
+    
     const firstTetromino = randomTetromino();
+    setNextTetromino(randomTetromino());
     setPlayer({
       pos: { x: BOARD_WIDTH / 2 - Math.ceil(firstTetromino.shape[0].length / 2), y: 0 },
       tetromino: firstTetromino,
       collided: false,
     });
-    setNextTetromino(randomTetromino());
   }, []);
 
   const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided?: boolean }): void => {
@@ -111,9 +121,8 @@ export function BlockDropGame() {
 
   const movePlayer = (dir: number) => {
     if (gameOver || isPaused) return;
-    const tempPlayer = {...player, pos: {x: player.pos.x + dir, y: player.pos.y}};
-    if (!checkCollision(tempPlayer, board, { x: 0, y: 0 })) {
-      setPlayer(tempPlayer);
+    if (!checkCollision(player, board, { x: dir, y: 0 })) {
+      updatePlayerPos({ x: dir, y: 0 });
     }
   };
 
@@ -132,8 +141,6 @@ export function BlockDropGame() {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
       if (offset > clonedPlayer.tetromino.shape[0].length) {
-        // cannot rotate, so rotate back
-        clonedPlayer.tetromino.shape = rotate(rotate(rotate(clonedPlayer.tetromino.shape))); 
         return; 
       }
     }
@@ -181,31 +188,24 @@ export function BlockDropGame() {
                 });
             });
 
-            let clearedRowsCount = 0;
-            const sweptBoard: BoardState = [];
-
-            for (let y = newBoard.length - 1; y >= 0; y--) {
-                if (newBoard[y].every((cell: [string|number, string]) => cell[1] === 'merged')) {
-                    clearedRowsCount++;
-                } else {
-                    sweptBoard.unshift(newBoard[y]);
+            const sweptBoard: BoardState = newBoard.reduce((ack, row) => {
+                if (row.every(cell => cell[1] === 'merged')) {
+                    setRows(prev => prev + 1);
+                    const linePoints = [40, 100, 300, 1200];
+                    setScore(prev => prev + (linePoints[0] || 40) * (level + 1));
+                    ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+                    return ack;
                 }
-            }
-            for (let i = 0; i < clearedRowsCount; i++) {
-                sweptBoard.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
-            }
-            if (clearedRowsCount > 0) {
-                setRows(prev => prev + clearedRowsCount);
-                const linePoints = [40, 100, 300, 1200];
-                const points = linePoints[clearedRowsCount-1] || linePoints[3];
-                setScore(prev => prev + points * (level + 1));
-            }
+                ack.push(row);
+                return ack;
+            }, [] as BoardState);
+            
             return sweptBoard;
         });
 
         resetPlayer();
     }
-}, [player.collided, resetPlayer, level]);
+  }, [player.collided, resetPlayer, level]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -262,6 +262,10 @@ export function BlockDropGame() {
     }
   }
 
+  if (!isClient) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-2 lg:p-4">
       <Card className="w-full max-w-md lg:max-w-4xl mb-2 lg:mb-4 bg-card/80 backdrop-blur-sm border-white/10">
@@ -273,10 +277,10 @@ export function BlockDropGame() {
       </Card>
       
       <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full max-w-md lg:max-w-4xl">
-        <div className="flex-grow flex flex-col items-center w-full">
+        <div className="flex-grow flex flex-col items-center w-full max-w-[25vh] sm:max-w-[40vh] lg:max-w-md">
           <div className="relative w-full">
             <GameBoard board={board} player={player} />
-            {gameOver && !player.collided && (
+            {gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
                 <h2 className="text-3xl font-bold text-white">Game Over</h2>
                 <Button onClick={startGame} className="mt-4" variant="secondary">
@@ -379,3 +383,5 @@ export function BlockDropGame() {
     </div>
   );
 }
+
+    
