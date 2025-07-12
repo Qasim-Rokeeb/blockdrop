@@ -17,7 +17,7 @@ export async function GET() {
         buttonTitle: "Launch Frame",
         splashImageUrl: `https://blockdrop-nine.vercel.app/splash.png`,
         splashBackgroundColor: "#f7f7f7",
-        webhookUrl: `${appUrl}/api/webhook`,
+        webhookUrl: `https://blockdrop-nine.vercel.app/api/webhook`,
       },
     };
   
