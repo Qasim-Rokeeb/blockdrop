@@ -65,7 +65,7 @@ export function BlockDropGame() {
   const resetPlayer = useCallback(() => {
     const newTetromino = randomTetromino();
     const newPlayer = {
-      pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
+      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
       tetromino: newTetromino.shape,
       collided: false,
     };
@@ -89,7 +89,7 @@ export function BlockDropGame() {
     setDropTime(1000);
     const newTetromino = randomTetromino();
     setPlayer({
-      pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
+      pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
       tetromino: newTetromino.shape,
       collided: false,
     });
@@ -103,18 +103,18 @@ export function BlockDropGame() {
     }));
   };
 
-  const movePlayer = (dir: number) => {
+  const movePlayer = useCallback((dir: number) => {
     if (!checkCollision(player, board, { x: dir, y: 0 })) {
       updatePlayerPos({ x: dir, y: 0 });
     }
-  };
+  }, [player, board, checkCollision]);
 
   const rotate = (matrix: TetrominoShape): TetrominoShape => {
     const rotated = matrix.map((_, index) => matrix.map(col => col[index]));
     return rotated.map(row => row.reverse());
   };
 
-  const playerRotate = (board: BoardState) => {
+  const playerRotate = useCallback((board: BoardState) => {
     const clonedPlayer = JSON.parse(JSON.stringify(player));
     clonedPlayer.tetromino = rotate(clonedPlayer.tetromino);
 
@@ -122,17 +122,14 @@ export function BlockDropGame() {
     while (checkCollision(clonedPlayer, board, { x: 0, y: 0 })) {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
-      if (offset > clonedPlayer.tetromino[0].length) {
-        // If it can't rotate back, revert to original rotation
-        clonedPlayer.tetromino = rotate(clonedPlayer.tetromino);
-        clonedPlayer.pos.x = player.pos.x; // reset position as well
+      if (offset > clonedPlayer.tetromino[0].length + 1) {
         return; 
       }
     }
     setPlayer(clonedPlayer);
-  };
+  }, [player, checkCollision]);
   
-  const drop = () => {
+  const drop = useCallback(() => {
     if (isPaused || gameOver) return;
 
     if (!checkCollision(player, board, { x: 0, y: 1 })) {
@@ -145,16 +142,16 @@ export function BlockDropGame() {
       }
       updatePlayerPos({ x: 0, y: 0, collided: true });
     }
-  };
+  }, [isPaused, gameOver, player, board, checkCollision]);
   
-  const hardDrop = () => {
+  const hardDrop = useCallback(() => {
     if (isPaused || gameOver) return;
     let dropY = 0;
     while (!checkCollision(player, board, { x: 0, y: dropY + 1 })) {
       dropY++;
     }
     updatePlayerPos({ x: 0, y: dropY, collided: true });
-  }
+  }, [isPaused, gameOver, player, board, checkCollision]);
 
   useEffect(() => {
     if (player.collided) {
@@ -171,18 +168,23 @@ export function BlockDropGame() {
             });
         });
 
-        const sweepRows = (newBoard: BoardState) => {
+        const sweepRows = (b: BoardState) => {
             let clearedRows = 0;
-            const sweptBoard = newBoard.reduce((ack, row) => {
+            const sweptBoard: BoardState = [];
+
+            for (let y = b.length - 1; y >= 0; y--) {
+                const row = b[y];
                 if (row.every(cell => cell[0] !== 0)) {
                     clearedRows++;
-                    ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
-                    return ack;
+                } else {
+                    sweptBoard.unshift(row);
                 }
-                ack.push(row);
-                return ack;
-            }, [] as BoardState);
-            
+            }
+
+            for (let i = 0; i < clearedRows; i++) {
+                sweptBoard.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+            }
+
             if (clearedRows > 0) {
                 setRows(prev => prev + clearedRows);
                 const linePoints = [40, 100, 300, 1200];
@@ -230,9 +232,12 @@ export function BlockDropGame() {
   }
 
   const handleMobileInput = (key: string) => {
-    if (!gameOver && !isPaused) {
-      move({ key });
-    }
+    if (gameOver || isPaused) return;
+    if (key === 'ArrowLeft') movePlayer(-1);
+    else if (key === 'ArrowRight') movePlayer(1);
+    else if (key === 'ArrowDown') drop();
+    else if (key === 'ArrowUp') playerRotate(board);
+    else if (key === ' ') hardDrop();
   }
 
   const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>, key: string) => {
@@ -297,7 +302,7 @@ export function BlockDropGame() {
         )}
       </div>
 
-      <div className="grid grid-cols-3 grid-rows-2 gap-2 md:hidden mt-4 w-full max-w-xs">
+      <div className="grid grid-cols-3 grid-rows-3 gap-2 md:hidden mt-4 w-full max-w-xs">
           <div className="col-start-2 row-start-1 flex justify-center">
             <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
           </div>
@@ -317,5 +322,3 @@ export function BlockDropGame() {
     </div>
   );
 }
-
-    
