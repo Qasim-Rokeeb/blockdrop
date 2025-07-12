@@ -9,7 +9,7 @@ import {
   randomTetromino,
 } from '@/lib/tetris';
 import { useInterval } from '@/hooks/use-interval';
-import type { BoardState, Player, Tetromino, TetrominoShape } from '@/types/tetris';
+import type { BoardState, Player, Tetromino, TetrominoShape, CellState } from '@/types/tetris';
 
 import GameBoard from './game/game-board';
 import NextPiece from './game/next-piece';
@@ -34,7 +34,7 @@ const initialPlayerState: Player = {
 };
 
 export function BlockDropGame() {
-  const [board, setBoard] = useState<BoardState>(createBoard());
+  const [board, setBoard] = useState<BoardState>(() => createBoard() as BoardState);
   const [player, setPlayer] = useState<Player>(initialPlayerState);
   const [nextTetromino, setNextTetromino] = useState<Tetromino>(TETROMINOES[0]);
   const [score, setScore] = useState(0);
@@ -47,7 +47,7 @@ export function BlockDropGame() {
 
   const startGame = useCallback(() => {
     const newBoard = createBoard();
-    setBoard(newBoard);
+    setBoard(newBoard as BoardState);
     setScore(0);
     setRows(0);
     setLevel(0);
@@ -192,13 +192,13 @@ export function BlockDropGame() {
         });
 
         let clearedRows = 0;
-        const sweptBoard = newBoard.reduce((ack: BoardState, row: (string|number)[][]) => {
+        const sweptBoard = newBoard.reduce((ack: BoardState, row: CellState[]) => {
             if (row.every(cell => cell[1] === 'merged')) {
                 clearedRows++;
-                ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear']));
+                ack.unshift(Array(BOARD_WIDTH).fill([0, 'clear'] as CellState));
                 return ack;
             }
-            ack.push(row);
+            ack.push(row as CellState[]);
             return ack;
         }, [] as BoardState);
         
