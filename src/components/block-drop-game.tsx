@@ -14,10 +14,10 @@ import type { BoardState, Player, TetrominoShape } from '@/types/tetris';
 
 import GameBoard from './game/game-board';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Pause, Play, RefreshCw } from 'lucide-react';
 
-const StatusDisplay: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+const StatusDisplay: React.FC<{ label: string; value: number | string }> = ({ label, value }) => (
   <div className="flex flex-col items-center">
     <span className="text-sm text-muted-foreground">{label}</span>
     <span className="text-2xl font-bold text-primary">{value}</span>
@@ -40,12 +40,21 @@ export function BlockDropGame() {
 
   const resetPlayer = useCallback(() => {
     const newTetromino = randomTetromino();
-    setPlayer({
+    const newPlayer = {
       pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
       tetromino: newTetromino.shape,
       collided: false,
-    });
-  }, []);
+    };
+    
+    // Check if the new piece collides immediately. If so, game over.
+    if (checkCollision(newPlayer, board, { x: 0, y: 0 })) {
+      setGameOver(true);
+      setDropTime(null);
+    } else {
+      setPlayer(newPlayer);
+    }
+
+  }, [board]); // Added board dependency
   
   const checkCollision = (
     playerToCheck: Player,
@@ -57,10 +66,11 @@ export function BlockDropGame() {
         if (playerToCheck.tetromino[y][x] !== 0) {
           const newY = y + playerToCheck.pos.y + moveY;
           const newX = x + playerToCheck.pos.x + moveX;
+
           if (
-            !boardToCheck[newY] ||
-            !boardToCheck[newY][newX] ||
-            boardToCheck[newY][newX] !== 0
+            newY >= BOARD_HEIGHT || // Check bottom boundary
+            newX < 0 || newX >= BOARD_WIDTH || // Check side boundaries
+            (boardToCheck[newY] && boardToCheck[newY][newX] !== 0) // Check for existing pieces
           ) {
             return true;
           }
@@ -76,10 +86,15 @@ export function BlockDropGame() {
     setRows(0);
     setLevel(0);
     setDropTime(1000);
-    resetPlayer();
+    const newTetromino = randomTetromino();
+    setPlayer({
+        pos: { x: BOARD_WIDTH / 2 - 1, y: 0 },
+        tetromino: newTetromino.shape,
+        collided: false,
+    });
     setGameOver(false);
     setIsPaused(false);
-  }, [resetPlayer]);
+  }, []);
 
   const updatePlayerPos = ({ x, y, collided }: { x: number; y: number; collided: boolean }): void => {
     setPlayer(prev => ({
@@ -110,8 +125,9 @@ export function BlockDropGame() {
       clonedPlayer.pos.x += offset;
       offset = -(offset + (offset > 0 ? 1 : -1));
       if (offset > clonedPlayer.tetromino[0].length) {
-        clonedPlayer.pos.x = pos; // Reset position if rotation is not possible
-        clonedPlayer.tetromino = rotate(clonedPlayer.tetromino); // Rotate back
+         // Revert rotation if it's not possible
+        clonedPlayer.tetromino = rotate(rotate(rotate(clonedPlayer.tetromino)));
+        clonedPlayer.pos.x = pos; // Reset position
         return;
       }
     }
@@ -135,12 +151,11 @@ export function BlockDropGame() {
   
   const hardDrop = () => {
     if (isPaused || gameOver) return;
-    let newY = player.pos.y;
-    while (!checkCollision(player, board, { x: 0, y: newY - player.pos.y + 1 })) {
-      newY++;
+    let dropY = 0;
+    while (!checkCollision(player, board, { x: 0, y: dropY + 1 })) {
+      dropY++;
     }
-    // Set position to the last valid spot before collision
-    setPlayer(prev => ({ ...prev, pos: { ...prev.pos, y: newY }, collided: true }));
+    updatePlayerPos({ x: 0, y: dropY, collided: true });
   }
 
   useEffect(() => {
@@ -154,8 +169,15 @@ export function BlockDropGame() {
         });
       });
       
-      const sweptBoard: BoardState = newBoardState.filter(row => row.some(cell => cell === 0));
-      const clearedRows = BOARD_HEIGHT - sweptBoard.length;
+      const sweptBoard: BoardState = [];
+      let clearedRows = 0;
+      for (let y = newBoardState.length - 1; y >= 0; y--) {
+        if (newBoardState[y].every(cell => cell !== 0)) {
+          clearedRows++;
+        } else {
+          sweptBoard.unshift(newBoardState[y]);
+        }
+      }
 
       if (clearedRows > 0) {
         setRows(prev => prev + clearedRows);
@@ -186,15 +208,15 @@ export function BlockDropGame() {
     }
   }, [level, isPaused, gameOver]);
   
-  const move = ({ key }: { key: string }) => {
+  const move = useCallback((e: React.KeyboardEvent | { key: string }) => {
     if (!gameOver && !isPaused) {
-      if (key === 'ArrowLeft') movePlayer(-1);
-      else if (key === 'ArrowRight') movePlayer(1);
-      else if (key === 'ArrowDown') drop();
-      else if (key === 'ArrowUp') playerRotate(board);
-      else if (key === ' ') hardDrop();
+      if (e.key === 'ArrowLeft') movePlayer(-1);
+      else if (e.key === 'ArrowRight') movePlayer(1);
+      else if (e.key === 'ArrowDown') drop();
+      else if (e.key === 'ArrowUp') playerRotate(board);
+      else if (e.key === ' ') hardDrop();
     }
-  };
+  }, [board, gameOver, isPaused]); // memoize move handler
   
   useInterval(() => {
     drop();
@@ -217,7 +239,7 @@ export function BlockDropGame() {
       className="flex flex-col items-center gap-4 outline-none" 
       role="button" 
       tabIndex={0} 
-      onKeyDown={e => move(e)}
+      onKeyDown={move}
       autoFocus
     >
       <Card className="bg-card/50 backdrop-blur-sm border-white/20">
@@ -289,5 +311,3 @@ export function BlockDropGame() {
     </div>
   );
 }
-
-  
