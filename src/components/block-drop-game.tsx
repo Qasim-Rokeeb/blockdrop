@@ -288,9 +288,9 @@ export function BlockDropGame() {
         </CardContent>
       </Card>
       
-      <div className="flex flex-col md:flex-row items-center md:items-start gap-4 w-full max-w-sm md:max-w-4xl">
+      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full max-w-sm md:max-w-4xl lg:max-w-6xl">
         <div className="flex-grow flex flex-col items-center w-full">
-          <div className="relative w-full max-w-[80vw] sm:max-w-[40vh] md:max-w-none">
+          <div className="relative w-full max-w-md">
             <GameBoard board={board} player={player} />
             {gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
@@ -312,47 +312,17 @@ export function BlockDropGame() {
             )}
           </div>
         </div>
-        <div className="w-full md:w-48 flex flex-col gap-4">
-          
-          <div className="md:hidden flex flex-row gap-4 w-full">
-              <Card className="flex-1 bg-card/80 backdrop-blur-sm border-white/10">
-                  <CardHeader>
-                      <CardTitle className="text-lg text-center">Next</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                      <NextPiece tetromino={nextTetromino} />
-                  </CardContent>
-              </Card>
-              <div className="flex-1 flex items-center justify-center">
-                  <div className="flex items-center justify-center gap-2">
-                  {gameOver ? (
-                      <Button onClick={startGame} size="lg" className="w-full">
-                      <Play className="mr-2 h-4 w-4" /> Start
-                      </Button>
-                  ) : (
-                      <>
-                      <Button onClick={togglePause} variant="secondary" className="flex-1 aspect-square h-14">
-                          {isPaused ? <Play/> : <Pause/>}
-                      </Button>
-                      <Button onClick={startGame} variant="secondary" className="flex-1 aspect-square h-14">
-                          <RefreshCw />
-                      </Button>
-                      </>
-                  )}
-                  </div>
-              </div>
-          </div>
-
-          <Card className="hidden md:block bg-card/80 backdrop-blur-sm border-white/10">
+        <div className="w-full lg:w-48 flex flex-col gap-4">
+          <Card className="bg-card/80 backdrop-blur-sm border-white/10">
               <CardHeader>
-                  <CardTitle className="text-lg">Next Piece</CardTitle>
+                  <CardTitle className="text-lg text-center lg:text-left">Next Piece</CardTitle>
               </CardHeader>
               <CardContent>
                   <NextPiece tetromino={nextTetromino} />
               </CardContent>
           </Card>
 
-          <div className="hidden md:flex flex-col items-center justify-center gap-2">
+          <div className="flex flex-col items-center justify-center gap-2">
             {gameOver ? (
               <Button onClick={startGame} size="lg" className="w-full">
                 <Play className="mr-2 h-4 w-4" /> Start Game
@@ -371,14 +341,11 @@ export function BlockDropGame() {
         </div>
       </div>
 
-      <div className="md:hidden mt-4 w-full max-w-xs mx-auto">
-        <div className="flex justify-between items-center">
-            <div className="flex flex-col gap-2">
-              <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
-            </div>
+      <div className="mt-4 w-full max-w-xs mx-auto">
+        <div className="flex justify-center items-center">
             <div className="grid grid-cols-3 grid-rows-2 gap-2">
               <div className="col-start-2 row-start-1 flex justify-center">
-                {/* Placeholder for up action if needed */}
+                 <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
               </div>
               <div className="col-start-1 row-start-2 flex justify-center">
                 <Button onClick={() => handleMobileInput('left')} className="w-16 h-16 rounded-full"><ArrowLeft size={28}/></Button>
