@@ -1,10 +1,11 @@
 # 🎮 Block Drop.
 
-This is a simple block dropping game built using Next.js, React, and Tailwind CSS, providing a basic implementation of the classic Tetris game.
+This is a simple block dropping game built using Next.js, React, and Tailwind CSS, providing a basic implementation of the classic Tetris game and a fun Farcaster miniapp.
 
 ## Description
 
 This project demonstrates a fundamental implementation of a block dropping puzzle game. Players control falling blocks, aiming to complete horizontal lines to clear them and score points. The game includes basic features like piece movement, rotation, and line clearing.
+The game is a basic implementation of Tetris. It's a fun Farcaster miniapp.
 
 ## Technologies Used
 
