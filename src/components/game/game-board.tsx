@@ -1,14 +1,32 @@
+
 "use client";
 
 import React from 'react';
 import Cell from './cell';
-import type { BoardState } from '@/types/tetris';
+import type { BoardState, Player } from '@/types/tetris';
 
 type GameBoardProps = {
   board: BoardState;
+  player: Player;
 };
 
-const GameBoard: React.FC<GameBoardProps> = ({ board }) => {
+const GameBoard: React.FC<GameBoardProps> = ({ board, player }) => {
+  const displayBoard = JSON.parse(JSON.stringify(board));
+
+  if (!player.collided) {
+    player.tetromino.forEach((row, y) => {
+      row.forEach((value, x) => {
+        if (value !== 0) {
+          const boardY = y + player.pos.y;
+          const boardX = x + player.pos.x;
+          if (displayBoard[boardY]) {
+             displayBoard[boardY][boardX] = value;
+          }
+        }
+      });
+    });
+  }
+
   return (
     <div
       className="grid border-l border-t border-white/20 bg-black/30 shadow-lg rounded-lg overflow-hidden"
@@ -19,11 +37,13 @@ const GameBoard: React.FC<GameBoardProps> = ({ board }) => {
         height: 'min(80vh, 600px)',
       }}
     >
-      {board.map((row, y) =>
-        row.map((cell, x) => <Cell key={`${y}-${x}`} type={cell} />)
+      {displayBoard.map((row: (string|number)[], y: number) =>
+        row.map((cell: string|number, x: number) => <Cell key={`${y}-${x}`} type={cell} />)
       )}
     </div>
   );
 };
 
 export default GameBoard;
+
+  

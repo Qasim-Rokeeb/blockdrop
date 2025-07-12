@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -8,7 +9,8 @@ type CellProps = {
 };
 
 const Cell: React.FC<CellProps> = ({ type }) => {
-  const color = TETROMINOES[type as keyof typeof TETROMINOES]?.color || TETROMINOES['0'].color;
+  const colorKey = typeof type === 'string' ? type : '0';
+  const color = TETROMINOES[colorKey]?.color || TETROMINOES['0'].color;
   const isFilled = type !== 0;
 
   return (
@@ -17,11 +19,15 @@ const Cell: React.FC<CellProps> = ({ type }) => {
       style={{ 
         backgroundColor: color,
         boxShadow: isFilled 
-          ? 'inset 2px 2px 4px rgba(255, 255, 255, 0.2), inset -2px -2px 4px rgba(0, 0, 0, 0.3)' 
+          ? 'inset 1px 1px 2px rgba(255, 255, 255, 0.2), inset -1px -1px 2px rgba(0, 0, 0, 0.3)' 
           : 'none',
+        borderRight: '1px solid rgba(0,0,0,0.1)',
+        borderBottom: '1px solid rgba(0,0,0,0.1)',
        }}
     ></div>
   );
 };
 
 export default React.memo(Cell);
+
+  
