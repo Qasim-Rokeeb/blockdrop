@@ -45,10 +45,6 @@ export function BlockDropGame() {
   const [isPaused, setIsPaused] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-  
   const startGame = useCallback(() => {
     const newBoard = createBoard();
     setBoard(newBoard);
@@ -70,11 +66,12 @@ export function BlockDropGame() {
   }, []);
 
   useEffect(() => {
-    if(isClient && gameOver) {
-       // On initial load, set a valid "next" piece, but don't start the game.
+    setIsClient(true);
+    // On initial load, set a valid "next" piece, but don't start the game.
+    if(gameOver) {
       setNextTetromino(randomTetromino());
     }
-  }, [isClient, gameOver]);
+  }, []);
 
 
   const checkCollision = useCallback((
@@ -280,7 +277,7 @@ export function BlockDropGame() {
 
   return (
     <div className="flex flex-col items-center justify-center w-full h-full p-2 md:p-4">
-      <Card className="w-full max-w-sm md:max-w-4xl mb-2 md:mb-4 bg-card/80 backdrop-blur-sm border-white/10">
+      <Card className="w-full max-w-sm md:max-w-md mb-2 md:mb-4 bg-card/80 backdrop-blur-sm border-white/10">
         <CardContent className="flex flex-row justify-around gap-4 p-3">
           <StatusDisplay icon={<Trophy size={20}/>} label="Score" value={score} />
           <StatusDisplay icon={<Layers size={20}/>} label="Rows" value={rows} />
@@ -288,9 +285,9 @@ export function BlockDropGame() {
         </CardContent>
       </Card>
       
-      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full max-w-sm md:max-w-4xl lg:max-w-6xl">
+      <div className="flex flex-col lg:flex-row items-center lg:items-start gap-4 w-full max-w-sm md:max-w-md lg:max-w-xl">
         <div className="flex-grow flex flex-col items-center w-full">
-          <div className="relative w-full max-w-md">
+          <div className="relative w-full max-w-sm">
             <GameBoard board={board} player={player} />
             {gameOver && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
@@ -341,7 +338,7 @@ export function BlockDropGame() {
         </div>
       </div>
 
-      <div className="mt-4 w-full max-w-xs mx-auto">
+      <div className="mt-8 lg:mt-4 w-full max-w-xs mx-auto">
         <div className="flex justify-center items-center">
             <div className="grid grid-cols-3 grid-rows-2 gap-2">
               <div className="col-start-2 row-start-1 flex justify-center">
