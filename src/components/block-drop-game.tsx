@@ -70,13 +70,13 @@ export function BlockDropGame() {
       collided: false,
     };
     
-    if (checkCollision(newPlayer, board, { x: 0, y: 0 })) {
+    if (checkCollision(newPlayer, createBoard(), { x: 0, y: 0 })) {
       setGameOver(true);
       setDropTime(null);
     } else {
       setPlayer(newPlayer);
     }
-  }, [board, checkCollision]);
+  }, [checkCollision]);
 
   const startGame = useCallback(() => {
     const newBoard = createBoard();
@@ -193,10 +193,24 @@ export function BlockDropGame() {
             return sweptBoard;
         }
 
-        setBoard(sweepRows(newBoard));
-        resetPlayer();
+        const sweptBoard = sweepRows(newBoard);
+        setBoard(sweptBoard);
+
+        const newTetromino = randomTetromino();
+        const newPlayer = {
+            pos: { x: BOARD_WIDTH / 2 - 2, y: 0 },
+            tetromino: newTetromino.shape,
+            collided: false,
+        };
+
+        if (checkCollision(newPlayer, sweptBoard, { x: 0, y: 0 })) {
+            setGameOver(true);
+            setDropTime(null);
+        } else {
+            setPlayer(newPlayer);
+        }
     }
-  }, [player.collided, level, resetPlayer, board]);
+  }, [player.collided, level, board, checkCollision]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -231,20 +245,27 @@ export function BlockDropGame() {
     }
   }
 
-  const handleMobileInput = (key: string) => {
+  const handleMobileInput = (action: 'left' | 'right' | 'down' | 'rotate' | 'drop') => {
     if (gameOver || isPaused) return;
-    if (key === 'ArrowLeft') movePlayer(-1);
-    else if (key === 'ArrowRight') movePlayer(1);
-    else if (key === 'ArrowDown') drop();
-    else if (key === 'ArrowUp') playerRotate(board);
-    else if (key === ' ') hardDrop();
+    switch(action) {
+      case 'left':
+        movePlayer(-1);
+        break;
+      case 'right':
+        movePlayer(1);
+        break;
+      case 'down':
+        drop();
+        break;
+      case 'rotate':
+        playerRotate(board);
+        break;
+      case 'drop':
+        hardDrop();
+        break;
+    }
   }
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>, key: string) => {
-    e.preventDefault();
-    handleMobileInput(key);
-  };
-  
   return (
     <div 
       className="flex flex-col items-center gap-4 outline-none" 
@@ -265,7 +286,7 @@ export function BlockDropGame() {
 
       <div className="relative">
         <GameBoard board={board} player={player} />
-        {gameOver && (
+        {gameOver && !player.collided && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 rounded-lg">
             <h2 className="text-3xl font-bold text-white">Game Over</h2>
             <Button onClick={startGame} className="mt-4" variant="secondary">
@@ -304,19 +325,19 @@ export function BlockDropGame() {
 
       <div className="grid grid-cols-3 grid-rows-3 gap-2 md:hidden mt-4 w-full max-w-xs">
           <div className="col-start-2 row-start-1 flex justify-center">
-            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowUp')} className="w-16 h-16"><ArrowUp/></Button>
+            <Button onClick={() => handleMobileInput('rotate')} className="w-16 h-16"><ArrowUp/></Button>
           </div>
           <div className="col-start-1 row-start-2 flex justify-center">
-            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowLeft')} className="w-16 h-16"><ArrowLeft/></Button>
+            <Button onClick={() => handleMobileInput('left')} className="w-16 h-16"><ArrowLeft/></Button>
           </div>
           <div className="col-start-2 row-start-2 flex justify-center">
-            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowDown')} className="w-16 h-16"><ArrowDown/></Button>
+            <Button onClick={() => handleMobileInput('down')} className="w-16 h-16"><ArrowDown/></Button>
           </div>
           <div className="col-start-3 row-start-2 flex justify-center">
-            <Button onTouchStart={(e) => handleTouchStart(e, 'ArrowRight')} className="w-16 h-16"><ArrowRight/></Button>
+            <Button onClick={() => handleMobileInput('right')} className="w-16 h-16"><ArrowRight/></Button>
           </div>
           <div className="col-span-3 row-start-3 mt-2">
-              <Button onTouchStart={(e) => handleTouchStart(e, ' ')} className="w-full h-16 font-bold">DROP</Button>
+              <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold">DROP</Button>
           </div>
       </div>
     </div>
