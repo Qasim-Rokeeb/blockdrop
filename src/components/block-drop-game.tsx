@@ -150,7 +150,7 @@ export function BlockDropGame() {
       }
       updatePlayerPos({ x: 0, y: 0, collided: true });
     }
-  }, [isPaused, gameOver, player, board, checkCollision]);
+  }, [isPaused, gameOver, player, board, checkCollision, updatePlayerPos]);
   
   const hardDrop = useCallback(() => {
     if (isPaused || gameOver) return;
@@ -159,7 +159,7 @@ export function BlockDropGame() {
       dropY++;
     }
     updatePlayerPos({ x: 0, y: dropY, collided: true });
-  }, [isPaused, gameOver, player, board, checkCollision]);
+  }, [isPaused, gameOver, player, board, checkCollision, updatePlayerPos]);
 
   useEffect(() => {
     if (player.collided) {
@@ -185,7 +185,7 @@ export function BlockDropGame() {
                 const sweptBoard: BoardState = [];
 
                 for (let y = b.length - 1; y >= 0; y--) {
-                    if (b[y].every(cell => cell[0] !== 0)) {
+                    if (b[y].every(cell => cell[0] !== 0 && cell[1] === 'merged')) {
                         clearedRowsCount++;
                     } else {
                         sweptBoard.unshift(b[y]);
@@ -208,7 +208,7 @@ export function BlockDropGame() {
 
         resetPlayer();
     }
-}, [player.collided, level, resetPlayer]);
+}, [player, level, resetPlayer]);
   
   useEffect(() => {
     if (!gameOver && rows > (level + 1) * 10) {
@@ -224,7 +224,7 @@ export function BlockDropGame() {
     }
   }, [level, isPaused, gameOver]);
   
-  const move = useCallback((e: KeyboardEvent | { key: string }) => {
+  const move = useCallback((e: { key: string }) => {
     if (gameOver || isPaused) return;
     if (e.key === 'ArrowLeft') movePlayer(-1);
     else if (e.key === 'ArrowRight') movePlayer(1);
@@ -255,26 +255,26 @@ export function BlockDropGame() {
     if (gameOver || isPaused) return;
     switch(action) {
       case 'left':
-        movePlayer(-1);
+        move({ key: 'ArrowLeft' });
         break;
       case 'right':
-        movePlayer(1);
+        move({ key: 'ArrowRight' });
         break;
       case 'down':
-        drop();
+        move({ key: 'ArrowDown' });
         break;
       case 'rotate':
-        playerRotate(board);
+        move({ key: 'ArrowUp' });
         break;
       case 'drop':
-        hardDrop();
+        move({ key: ' ' });
         break;
     }
   }
 
   return (
     <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8 w-full max-w-5xl">
-      <div className="flex-1 w-full flex flex-col items-center">
+      <div className="w-full flex flex-col items-center">
         <div className="relative">
           <GameBoard board={board} player={player} />
           {gameOver && !player.collided && (
@@ -298,18 +298,48 @@ export function BlockDropGame() {
         </div>
       </div>
       <div className="w-full lg:w-64 flex flex-col gap-4">
+        
+        <div className="lg:hidden flex flex-row gap-4 w-full">
+            <Card className="flex-1 bg-card/80 backdrop-blur-sm border-white/10">
+                <CardHeader>
+                    <CardTitle className="text-lg text-center">Next</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <NextPiece tetromino={nextTetromino} />
+                </CardContent>
+            </Card>
+            <div className="flex-1 flex items-center justify-center">
+                <div className="flex items-center justify-center gap-2">
+                {gameOver ? (
+                    <Button onClick={startGame} size="lg" className="w-full">
+                    <Play className="mr-2 h-4 w-4" /> Start
+                    </Button>
+                ) : (
+                    <>
+                    <Button onClick={togglePause} variant="secondary" className="flex-1 aspect-square h-14">
+                        {isPaused ? <Play/> : <Pause/>}
+                    </Button>
+                    <Button onClick={startGame} variant="secondary" className="flex-1 aspect-square h-14">
+                        <RefreshCw />
+                    </Button>
+                    </>
+                )}
+                </div>
+            </div>
+        </div>
+
         <Card className="bg-card/80 backdrop-blur-sm border-white/10">
-          <CardHeader>
+          <CardHeader className="hidden lg:flex">
             <CardTitle className="text-lg">Game Stats</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          <CardContent className="flex flex-row lg:flex-col justify-around lg:justify-start gap-4 p-4 lg:p-6 lg:pt-0">
             <StatusDisplay icon={<Trophy size={24}/>} label="Score" value={score} />
             <StatusDisplay icon={<Layers size={24}/>} label="Rows" value={rows} />
             <StatusDisplay icon={<Star size={24}/>} label="Level" value={level} />
           </CardContent>
         </Card>
         
-        <Card className="bg-card/80 backdrop-blur-sm border-white/10">
+        <Card className="hidden lg:block bg-card/80 backdrop-blur-sm border-white/10">
             <CardHeader>
                 <CardTitle className="text-lg">Next Piece</CardTitle>
             </CardHeader>
@@ -318,7 +348,7 @@ export function BlockDropGame() {
             </CardContent>
         </Card>
 
-        <div className="flex items-center justify-center gap-2">
+        <div className="hidden lg:flex items-center justify-center gap-2">
           {gameOver ? (
             <Button onClick={startGame} size="lg" className="w-full">
               <Play className="mr-2 h-4 w-4" /> Start Game
@@ -334,24 +364,29 @@ export function BlockDropGame() {
             </>
           )}
         </div>
-
-        <div className="grid grid-cols-3 grid-rows-3 gap-2 lg:hidden mt-4 w-full max-w-xs mx-auto">
-            <div className="col-start-2 row-start-1 flex justify-center">
-              <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
+        
+        <div className="lg:hidden mt-4 w-full max-w-xs mx-auto">
+            <div className="flex justify-between items-center">
+                 <div className="flex flex-col gap-2">
+                    <Button onClick={() => handleMobileInput('rotate')} className="w-20 h-20 rounded-full"><ArrowUp size={32}/></Button>
+                 </div>
+                 <div className="grid grid-cols-3 grid-rows-2 gap-2">
+                    <div className="col-start-2 row-start-1 flex justify-center">
+                      <Button onClick={() => handleMobileInput('down')} className="w-16 h-16 rounded-full"><ArrowDown size={28}/></Button>
+                    </div>
+                    <div className="col-start-1 row-start-2 flex justify-center">
+                      <Button onClick={() => handleMobileInput('left')} className="w-16 h-16 rounded-full"><ArrowLeft size={28}/></Button>
+                    </div>
+                    <div className="col-start-3 row-start-2 flex justify-center">
+                      <Button onClick={() => handleMobileInput('right')} className="w-16 h-16 rounded-full"><ArrowRight size={28}/></Button>
+                    </div>
+                 </div>
             </div>
-            <div className="col-start-1 row-start-2 flex justify-center">
-              <Button onClick={() => handleMobileInput('left')} className="w-20 h-20 rounded-full"><ArrowLeft size={32}/></Button>
-            </div>
-            <div className="col-start-2 row-start-2 flex justify-center">
-              <Button onClick={() => handleMobileInput('down')} className="w-20 h-20 rounded-full"><ArrowDown size={32}/></Button>
-            </div>
-            <div className="col-start-3 row-start-2 flex justify-center">
-              <Button onClick={() => handleMobileInput('right')} className="w-20 h-20 rounded-full"><ArrowRight size={32}/></Button>
-            </div>
-            <div className="col-span-3 row-start-3 mt-2">
+            <div className="mt-4">
                 <Button onClick={() => handleMobileInput('drop')} className="w-full h-16 font-bold text-lg">DROP</Button>
             </div>
         </div>
+
       </div>
     </div>
   );
